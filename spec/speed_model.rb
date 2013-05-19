@@ -25,7 +25,7 @@ module ActiveRecord
         return
       end
 
-      relation = Xchema.find_relation(self.class, method)
+      relation = SpeedSchema.instance.find_relation(self.class, method)
       if !relation.nil?
         case(relation[:type])
         when :has_many
@@ -57,11 +57,11 @@ module ActiveRecord
     end
 
     def self.belongs_to(name, scope = nil, options = {})
-      Xchema.belongs_to(self, name, scope)
+      SpeedSchema.instance.belongs_to(self, name, scope)
     end
 
     def self.has_many(name, scope = nil, options = {})
-      Xchema.add_has_many(self, name, scope)
+      SpeedSchema.instance.has_many(self, name, scope)
     end
 
     def self.has_one(name, scope = nil, options = {})

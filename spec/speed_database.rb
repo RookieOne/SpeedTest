@@ -1,7 +1,10 @@
-
 class SpeedDatabase
 
   def initialize
+    @tables = {}
+  end
+
+  def clear
     @tables = {}
   end
 

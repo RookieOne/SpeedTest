@@ -6,6 +6,7 @@ require "speed_model"
 require "speed_database"
 require "speed_array"
 
+
 Dir[("app/services/*.rb")].each do |f| 
   file = f.gsub(".rb", "")
   require "./#{file}"
@@ -15,9 +16,7 @@ end
 # require 'devise'
 # require 'devise/orm/active_record'
 
-Db = SpeedDatabase.new
 
-Xchema = SpeedSchema.new
 
 Dir[("app/models/*.rb")].each do |f| 
   file = f.gsub(".rb", "")
@@ -32,12 +31,17 @@ end
 # require 'factory_girl'
 # require 'factories'
 
+Db = SpeedDatabase.new
+
 Dir[("spec/support/**/*.rb")].each do |f| 
   file = f.gsub(".rb", "")
   require "./#{file}"
 end
 
-# RSpec.configure do |config|
+RSpec.configure do |config|
+  config.before(:each) do
+    Db.clear
+  end
 #   config.include LoginHelpers, :type => :request
 #   config.include ContestHelpers
 #   config.include LeagueHelpers
@@ -47,4 +51,4 @@ end
 #   config.include WithdrawalRequestHelpers, :type => :request
 #   config.include BonusCodeHelpers
 #   config.include SurvivorContestHelpers
-# end
+end

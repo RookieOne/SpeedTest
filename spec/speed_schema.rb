@@ -1,4 +1,7 @@
+require "singleton"
+
 class SpeedSchema
+  include Singleton
 
   def initialize
     @models = {}
@@ -10,7 +13,7 @@ class SpeedSchema
     model << { type: :belongs_to, name: name, options: options }
   end
 
-  def add_has_many(klass, name, options={})
+  def has_many(klass, name, options={})
     model = find_or_create_model(klass)
     model << { type: :has_many, name: name, options: options }
   end

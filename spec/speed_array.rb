@@ -7,7 +7,7 @@ class ARArray < Array
   def create!(args)
     obj = @klass.create(args)
     # obj.set_attributes(args) 
-    callbacks = Xchema.find_callbacks(@klass)
+    callbacks = SpeedSchema.instance.find_callbacks(@klass)
     callbacks[:before_creates].each do |method|
       obj.send(method)
     end
