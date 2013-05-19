@@ -6,5 +6,7 @@ describe "create" do
   end
   it "should setup relation" do
     @blog.title.should == "New Blog"
+
+    Blog.count.should == 1
   end
 end

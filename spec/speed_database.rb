@@ -50,7 +50,6 @@ class SpeedDatabase
       end
     end
 
-    # binding.pry
     model_id_attribute = object.get_id_name_for_relations
 
     result = ARArray.new(table_name)

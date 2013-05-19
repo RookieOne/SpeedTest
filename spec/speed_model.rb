@@ -7,9 +7,7 @@ module ActiveRecord
     end
 
     def set_attributes(attributes)
-      binding.pry
       attributes.each do |key, value|
-        p "set #{key} to #{value}"
         assignment = "#{key}=".to_sym
         send(assignment, value)
       end
@@ -50,6 +48,8 @@ module ActiveRecord
       obj = self.new
       obj.id = self.count + 1
       obj.set_attributes(args.first)
+
+      Db.save(obj)
       obj
     end
 

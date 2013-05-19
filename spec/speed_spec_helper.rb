@@ -4,6 +4,7 @@ require 'pry'
 require "speed_schema"
 require "speed_model"
 require "speed_database"
+require "speed_array"
 
 Dir[("app/services/*.rb")].each do |f| 
   file = f.gsub(".rb", "")
@@ -13,29 +14,6 @@ end
 # require 'active_record'
 # require 'devise'
 # require 'devise/orm/active_record'
-
-class ARArray < Array
-  
-  def initialize(klass_string)
-    @klass = klass_string.constantize    
-  end
-
-  def create!(args)
-    obj = @klass.new
-    obj.set_attributes(args) 
-    callbacks = Xchema.find_callbacks(@klass)
-    callbacks[:before_creates].each do |method|
-      obj.send(method)
-    end
-
-    obj
-  end
-
-  def create(args)
-    create!(args)
-  end
-
-end
 
 Db = SpeedDatabase.new
 
