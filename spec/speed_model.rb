@@ -51,7 +51,7 @@ module ActiveRecord
     class << self
 
       def records
-        @records ||= []
+        @records ||= ARArray.new
       end
 
       def count
@@ -67,27 +67,29 @@ module ActiveRecord
         obj
       end
 
+      def where(*args) 
+        binding.pry     
+        records.where(self, args.first)
+      end
+
       def scopes
-        @scopes ||= []
+        @scopes ||= {}
       end
 
       def scope(*args)
         # @scopes
-        binding.pry
+        # binding.pry
+
         method_name = args.first.to_s
-        class_eval(<<-EOS, __FILE__, __LINE__ + 1)
-                  def #{method_name}                                          # def user
-                    #{foreign_key} && #{class_name}.find(#{foreign_key})      #   user_id && User.find(user_id)
-                  end                                                         # end
-                                                                              # 
-                  def #{to_model}?                                            # def user?
-                    #{foreign_key} && #{class_name}.exists?(#{foreign_key})   #   user_id && User.exists?(user_id)
-                  end                                                         # end
-                                                                              # 
-                  def #{to_model}=(object)                                    # def user=(model)
-                    self.#{foreign_key} = (object && object.#{primary_key})   #   self.user_id = (model && model.id)
-                  end                                                         # end
-                EOS
+        scopes[method_name] = args.second
+        class_eval <<-EVAL
+          def self.#{method_name}(*args)
+            binding.pry
+            # records.select do |record|
+              scopes['#{method_name}'].call(args.first)
+            # end
+          end
+        EVAL
       end
 
     end
@@ -151,9 +153,7 @@ module ActiveRecord
     def self.serialize(*args)
     end
 
-    def self.where(*args)      
-      Db.where(self, args.first)
-    end
+
 
   end 
 end
