@@ -94,6 +94,7 @@ module ActiveRecord
     end
 
     def self.scope(*args)
+      p 
     end
 
     def self.order(*args)
@@ -106,7 +107,7 @@ module ActiveRecord
     end
 
     def self.before_create(*args)
-      Xchema.add_before_create(self, args)
+      SpeedSchema.instance.add_before_create(self, args)
     end
 
     def self.after_initialize(*args)
@@ -121,7 +122,8 @@ module ActiveRecord
     def self.serialize(*args)
     end
 
-    def self.where(*args)
+    def self.where(*args)      
+      Db.where(self, args.first)
     end
 
   end 

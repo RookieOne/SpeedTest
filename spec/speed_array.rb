@@ -35,7 +35,7 @@ class ARArray < Array
     end
     self.select do |x|
       r = predicates.map { |p| p.call(x) }
-      !r.select{|r| r == false}.any?
+      !r.any?{|x| x == false}
     end
   end
 

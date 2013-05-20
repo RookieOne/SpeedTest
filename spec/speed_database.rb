@@ -63,4 +63,11 @@ class SpeedDatabase
     result
   end
 
+  def where(klass, args)    
+    table = find_or_create_table(klass.to_s)
+    # binding.pry
+    table.where(args)
+  end
+
+
 end
