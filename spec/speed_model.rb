@@ -48,17 +48,48 @@ module ActiveRecord
       Db.save(self)
     end
 
-    def self.count
-      Db.count(self.to_s)
-    end
+    class << self
 
-    def self.create(*args)
-      obj = self.new
-      obj.id = self.count + 1
-      obj.set_attributes(args.first)
+      def records
+        @records ||= []
+      end
 
-      Db.save(obj)
-      obj
+      def count
+        records.count
+      end
+
+      def create(*args)
+        obj = new
+        obj.id = self.count + 1
+        obj.set_attributes(args.first)
+
+        records << obj
+        obj
+      end
+
+      def scopes
+        @scopes ||= []
+      end
+
+      def scope(*args)
+        # @scopes
+        binding.pry
+        method_name = args.first.to_s
+        class_eval(<<-EOS, __FILE__, __LINE__ + 1)
+                  def #{method_name}                                          # def user
+                    #{foreign_key} && #{class_name}.find(#{foreign_key})      #   user_id && User.find(user_id)
+                  end                                                         # end
+                                                                              # 
+                  def #{to_model}?                                            # def user?
+                    #{foreign_key} && #{class_name}.exists?(#{foreign_key})   #   user_id && User.exists?(user_id)
+                  end                                                         # end
+                                                                              # 
+                  def #{to_model}=(object)                                    # def user=(model)
+                    self.#{foreign_key} = (object && object.#{primary_key})   #   self.user_id = (model && model.id)
+                  end                                                         # end
+                EOS
+      end
+
     end
 
     def self.attr_accessible(*args)
@@ -93,9 +124,7 @@ module ActiveRecord
     def self.default_scope(*args)
     end
 
-    def self.scope(*args)
-      p 
-    end
+
 
     def self.order(*args)
     end
