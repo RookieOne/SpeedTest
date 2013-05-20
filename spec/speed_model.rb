@@ -2,8 +2,16 @@
 module ActiveRecord
   class Base
 
+    def initialize(args = {})
+      set_attributes(args)
+    end
+
     def get_id_name_for_relations
       "#{self.class.to_s.downcase}_id"
+    end
+
+    def reload
+      self
     end
 
     def set_attributes(attributes)
