@@ -30,18 +30,18 @@ class SpeedDatabase
   end
 
   def get_table_name_from_method(method)
-    method.chop.split("_").map{|s| s.capitalize}.join
+    method.split("_").map{|s| s.capitalize}.join
   end
 
   def belongs_to(object, method, relation)
     table_name = get_table_name_from_method(method)
     table = find_or_create_table(table_name)   
-    binding.pry
-    table
+
+    table.where(id: object.id).first
   end
 
   def has_many(object, method, relation)
-    table_name = get_table_name_from_method(method)
+    table_name = get_table_name_from_method(method.chop)
     table = find_or_create_table(table_name)   
 
     options = relation[:options]
@@ -56,14 +56,11 @@ class SpeedDatabase
     model_id_attribute = object.get_id_name_for_relations
 
     result = ARArray.new(table_name)
+    result.set_parent(object)
     table.each do |model|
       result << model
     end
     result
-  end
-
-  def belongs_to(object, method, relation)
-    binding.pry
   end
 
 end

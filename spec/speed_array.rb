@@ -4,6 +4,10 @@ class ARArray < Array
     @klass = klass_string.constantize    
   end
 
+  def set_parent(parent)
+    @parent = parent
+  end
+
   def create!(args)
     obj = @klass.create(args)
     # obj.set_attributes(args) 
@@ -13,11 +17,26 @@ class ARArray < Array
     end
     self << obj
 
+    if @parent
+      attribute = "#{@parent.get_id_name_for_relations}=".to_sym
+      obj.send(attribute, @parent.id)
+    end
+
     obj
   end
 
   def create(args)
     create!(args)
+  end
+
+  def where(args)
+    predicates = args.map do |key, value|
+      Proc.new { |x| x.send(key) == value }
+    end
+    self.select do |x|
+      r = predicates.map { |p| p.call(x) }
+      !r.select{|r| r == false}.any?
+    end
   end
 
 end
