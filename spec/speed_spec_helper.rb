@@ -1,7 +1,11 @@
 require 'active_support/all'
+require 'active_model'
 require 'rubygems'
 require 'pry'
 require "speed_schema"
+require "speed_associations"
+require "speed_scopes"
+require "speed_dirty"
 require "speed_model"
 require "speed_database"
 require "speed_array"

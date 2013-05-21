@@ -1,159 +1,318 @@
 
 module ActiveRecord
   class Base
+    extend  ActiveModel::Naming
+    include ActiveModel::Conversion
+    include ActiveModel::Serializers::JSON
+    include ActiveModel::Serializers::Xml
+    # include Dirty, Observing, Callbacks, Validations
+    include Association::Model
+    include Scopes::Model
+    include Dirty
 
-    def initialize(args = {})
-      set_attributes(args)
-    end
-
-    def get_id_name_for_relations
-      "#{self.class.to_s.downcase}_id"
-    end
-
-    def reload
-      self
-    end
-
-    def set_attributes(attributes)
-      attributes.each do |key, value|
-        assignment = "#{key}=".to_sym
-        send(assignment, value)
-      end
-    end
-
-    def method_missing(method_sym, *args, &blk)
-      p "method missing"
-      method = method_sym.to_s
-      p method
+    class_attribute :known_attributes
+    self.known_attributes = []
+    
+    class << self
+      attr_accessor(:primary_key) #:nodoc:
       
-      if method.ends_with?("=")
-        attr_name = method.gsub("=", "")
-        class_eval { attr_accessor attr_name }
-        self.send(method_sym, args[0])
-        return
+      def primary_key
+        @primary_key ||= 'id'
       end
 
-      relation = SpeedSchema.instance.find_relation(self.class, method)
-      if !relation.nil?
-        case(relation[:type])
-        when :has_many
-          return Db.has_many(self, method, relation)
-        when :belongs_to
-          return Db.belongs_to(self, method, relation)
+      def attr_accessible(*args)
+      end
+      
+      def collection(&block)
+        @collection ||= Class.new(Array)
+        @collection.class_eval(&block) if block_given?
+        @collection
+      end
+
+      def attributes(*attributes)
+        self.known_attributes |= attributes.map(&:to_s)
+      end
+      
+      def records
+        @records ||= {}
+      end
+      
+      def find_by_attribute(name, value) #:nodoc:
+        item = records.values.find {|r| r.send(name) == value }
+        item && item.dup
+      end
+      
+      def find_all_by_attribute(name, value) #:nodoc:
+        items = records.values.select {|r| r.send(name) == value }
+        collection.new(items.deep_dup)
+      end
+      
+      def raw_find(id) #:nodoc:
+        records[id] || raise(UnknownRecord, "Couldn't find #{self.name} with ID=#{id}")
+      end
+      
+      # Find record by ID, or raise.
+      def find(id)
+        item = raw_find(id)
+        item && item.dup
+      end
+      alias :[] :find
+    
+      def first
+        item = records.values[0]
+        item && item.dup
+      end
+      
+      def last
+        item = records.values[-1]
+        item && item.dup
+      end
+      
+      def exists?(id)
+        records.has_key?(id)
+      end
+      
+      def count
+        records.length
+      end
+    
+      def all
+        collection.new(records.values.deep_dup)
+      end
+      
+      def select(&block)
+        collection.new(records.values.select(&block).deep_dup)
+      end
+      
+      def update(id, atts)
+        find(id).update_attributes(atts)
+      end
+      
+      def destroy(id)
+        find(id).destroy
+      end
+      
+      # Removes all records and executes 
+      # destroy callbacks.
+      def destroy_all
+        all.each {|r| r.destroy }
+      end
+      
+      # Removes all records without executing
+      # destroy callbacks.
+      def delete_all
+        records.clear
+      end
+      
+      # Create a new record.
+      # Example:
+      #   create(:name => "foo", :id => 1)
+      def create(atts = {})
+        rec = self.new(atts)
+        rec.save && rec
+      end
+      
+      def create!(*args)
+        create(*args) || raise(InvalidRecord)
+      end
+      
+      def method_missing(method_symbol, *args) #:nodoc:
+        method_name = method_symbol.to_s
+
+        if method_name =~ /^find_by_(\w+)!/
+          send("find_by_#{$1}", *args) || raise(UnknownRecord)
+        elsif method_name =~ /^find_by_(\w+)/
+          find_by_attribute($1, args.first)
+        elsif method_name =~ /^find_or_create_by_(\w+)/
+          send("find_by_#{$1}", *args) || create($1 => args.first)
+        elsif method_name =~ /^find_all_by_(\w+)/
+          find_all_by_attribute($1, args.first)
+        else
+          super
         end
       end
     end
+    
+    attr_accessor :attributes
+    attr_writer   :new_record
+    
+    def known_attributes
+      self.class.known_attributes | self.attributes.keys.map(&:to_s)
+    end
+    
+    def initialize(attributes = {})
+      @new_record = true
+      @attributes = {}.with_indifferent_access
+      @attributes.merge!(known_attributes.inject({}) {|h, n| h[n] = nil; h })
+      @changed_attributes = {}
+      load(attributes)
+    end
+    
+    def clone
+      cloned = attributes.reject {|k,v| k == self.class.primary_key }
+      cloned = cloned.inject({}) do |attrs, (k, v)|
+        attrs[k] = v.clone
+        attrs
+      end
+      self.class.new(cloned)
+    end
+    
+    def new?
+      @new_record || false
+    end
+    alias :new_record? :new?
+    
+    # Gets the <tt>\id</tt> attribute of the item.
+    def id
+      attributes[self.class.primary_key]
+    end
 
+    # Sets the <tt>\id</tt> attribute of the item.
+    def id=(id)
+      attributes[self.class.primary_key] = id
+    end
+    
+    def ==(other)
+      other.equal?(self) || (other.instance_of?(self.class) && other.id == id)
+    end
+
+    # Tests for equality (delegates to ==).
+    def eql?(other)
+      self == other
+    end
+    
+    def hash
+      id.hash
+    end
+    
+    def dup
+      self.class.new.tap do |base|
+        base.attributes = attributes
+        base.new_record = new_record?
+      end
+    end
+    
+    def save
+      new? ? create : update
+    end
+    
     def save!
-      Db.save(self)
+      save || raise(InvalidRecord)
     end
-
-    class << self
-
-      def records
-        @records ||= ARArray.new
+    
+    def exists?
+      !new?
+    end
+    alias_method :persisted?, :exists?
+    
+    def load(attributes) #:nodoc:
+      return unless attributes
+      attributes.each do |(name, value)| 
+        self.send("#{name}=".to_sym, value) 
       end
-
-      def count
-        records.count
+    end
+    
+    def reload
+      return self if new?
+      item = self.class.find(id)
+      load(item.attributes)
+      return self
+    end
+    
+    def update_attribute(name, value)
+      self.send("#{name}=".to_sym, value)
+      self.save
+    end
+    
+    def update_attributes(attributes)
+      load(attributes) && save
+    end
+    
+    def update_attributes!(attributes)
+      update_attributes(attributes) || raise(InvalidRecord)
+    end
+    
+    def has_attribute?(name)
+      @attributes.has_key?(name)
+    end
+    
+    alias_method :respond_to_without_attributes?, :respond_to?
+    
+    def respond_to?(method, include_priv = false)
+      method_name = method.to_s
+      if attributes.nil?
+        super
+      elsif known_attributes.include?(method_name)
+        true
+      elsif method_name =~ /(?:=|\?)$/ && attributes.include?($`)
+        true
+      else
+        super
       end
-
-      def create(*args)
-        obj = new
-        obj.id = self.count + 1
-        obj.set_attributes(args.first)
-
-        records << obj
-        obj
+    end
+    
+    def destroy
+      raw_destroy
+      self
+    end
+    
+    protected    
+      def read_attribute(name)
+        @attributes[name]
       end
-
-      def where(*args) 
-        binding.pry     
-        records.where(self, args.first)
+      
+      def write_attribute(name, value)
+        @attributes[name] = value
       end
-
-      def scopes
-        @scopes ||= {}
+      
+      def generate_id
+        object_id
       end
+      
+      def raw_destroy
+        self.class.records.delete(self.id)
+      end
+      
+      def raw_create
+        self.class.records[self.id] = self.dup
+      end
+      
+      def create
+        self.id ||= generate_id
+        self.new_record = false
+        raw_create
+        self.id
+      end
+      
+      def raw_update
+        item = self.class.raw_find(id)
+        item.load(attributes)
+      end
+      
+      def update
+        raw_update
+        true
+      end
+    
+    private
+      
+      def method_missing(method_symbol, *arguments) #:nodoc:
+        method_name = method_symbol.to_s
 
-      def scope(*args)
-        # @scopes
-        # binding.pry
-
-        method_name = args.first.to_s
-        scopes[method_name] = args.second
-        class_eval <<-EVAL
-          def self.#{method_name}(*args)
-            binding.pry
-            # records.select do |record|
-              scopes['#{method_name}'].call(args.first)
-            # end
+        if method_name =~ /(=|\?)$/
+          case $1
+          when "="
+            attribute_will_change!($`)
+            attributes[$`] = arguments.first
+          when "?"
+            attributes[$`]
           end
-        EVAL
+        else
+          return attributes[method_name] if attributes.include?(method_name)
+          return nil if known_attributes.include?(method_name)
+          super
+        end
       end
-
-    end
-
-    def self.attr_accessible(*args)
-    end
-
-    def self.belongs_to(name, scope = nil, options = {})
-      SpeedSchema.instance.belongs_to(self, name, scope)
-    end
-
-    def self.has_many(name, scope = nil, options = {})
-      SpeedSchema.instance.has_many(self, name, scope)
-    end
-
-    def self.has_one(name, scope = nil, options = {})
-    end
-
-    def self.validates_presence_of(*attr_names)
-    end
-
-    def self.validates_numericality_of(*attr_names)
-    end
-
-    def self.validates_email_format_of(*attr_names)
-    end
-
-    def self.validate(*attr_names)
-    end
-
-    def self.validates(*args)
-    end
-
-    def self.default_scope(*args)
-    end
-
-
-
-    def self.order(*args)
-    end
-
-    def self.devise(*args)
-    end
-
-    def self.before_save(*args)
-    end
-
-    def self.before_create(*args)
-      SpeedSchema.instance.add_before_create(self, args)
-    end
-
-    def self.after_initialize(*args)
-    end
-
-    def self.after_create(*args)
-    end
-
-    def self.after_save(*args)
-    end
-
-    def self.serialize(*args)
-    end
-
-
 
   end 
 end
